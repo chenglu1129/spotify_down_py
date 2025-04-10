@@ -24,7 +24,7 @@ jobs:
 
     - name: 执行下载脚本
       run: |
-        python spotify_downloader.py
+        python test.py
 
     - name: 提交 APK 到仓库（可选）
       run: |
