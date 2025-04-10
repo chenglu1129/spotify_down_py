@@ -1,56 +1,90 @@
 import os
 import requests
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from time import sleep
 from bs4 import BeautifulSoup
-import time
 
-# 保存路径
+# 从环境变量读取 123pan 登录 cookie
+COOKIE = os.environ.get("PAN_COOKIE")
 DOWNLOAD_DIR = "spotify_apks"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# 获取所有版本页面
-BASE_URL = "https://spotify.en.uptodown.com/android/versions"
-
 headers = {
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": "Mozilla/5.0",
+    "Cookie": COOKIE,  # 使用从 GitHub Secrets 获取的 cookie
 }
 
 def fetch_versions():
-    response = requests.get(BASE_URL, headers=headers)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
+    url = "https://spotify.en.uptodown.com/android/versions"
+    r = requests.get(url, headers=headers)
+    r.raise_for_status()
+    soup = BeautifulSoup(r.text, "html.parser")
 
-    version_links = []
-    for tag in soup.select("div.version div.more-info > a"):
-        href = tag.get("href")
-        if href and href.startswith("/android/download/"):
-            full_url = "https://spotify.en.uptodown.com" + href
-            version_links.append(full_url)
+    links = []
+    for a in soup.select("div.version div.more-info > a"):
+        href = a.get("href")
+        if href:
+            links.append("https://spotify.en.uptodown.com" + href)
+    return links
 
-    return version_links
+def download_apk(url):
+    print(f"Downloading: {url}")
+    r = requests.get(url, headers=headers)
+    r.raise_for_status()
+    name = url.strip("/").split("/")[-1] + ".apk"
+    path = os.path.join(DOWNLOAD_DIR, name)
+    with open(path, "wb") as f:
+        f.write(r.content)
+    print(f"Saved to: {path}")
+    return path
 
-def download_apk(download_url):
-    print(f"正在下载: {download_url}")
-    resp = requests.get(download_url, headers=headers, allow_redirects=True)
-    resp.raise_for_status()
+def upload_to_123pan(file_path):
+    print(f"Uploading {file_path} to 123 Pan")
+    
+    # 设置 ChromeOptions
+    options = Options()
+    options.add_argument("--headless")  # 无头浏览器，不弹出 UI
 
-    # 自动跟随跳转并获取最终文件
-    filename = download_url.strip("/").split("/")[-1] + ".apk"
-    filepath = os.path.join(DOWNLOAD_DIR, filename)
+    # 设置 ChromeDriver 路径
+    driver = webdriver.Chrome(executable_path='/path/to/chromedriver', options=options)
+    
+    # 登录页面
+    driver.get("https://www.123pan.com/")
+    sleep(3)
 
-    with open(filepath, "wb") as f:
-        f.write(resp.content)
-    print(f"已保存: {filepath}")
+    # 模拟登录（假设你已经有了 cookie，可以直接设置）
+    driver.add_cookie({"name": "token", "value": COOKIE})  # 使用 GitHub Secrets 中的 cookie
+    driver.get("https://www.123pan.com/")
+    sleep(3)
+
+    # 上传文件
+    upload_button = driver.find_element(By.ID, "upload-btn")  # 根据网页元素修改
+    upload_button.click()
+    sleep(2)
+
+    # 模拟选择文件上传
+    file_input = driver.find_element(By.CSS_SELECTOR, "input[type='file']")
+    file_input.send_keys(file_path)  # 选择要上传的文件路径
+    sleep(5)  # 等待文件上传
+
+    print(f"Uploaded: {file_path} to 123 Pan")
+
+    driver.quit()
 
 def main():
     versions = fetch_versions()
-    print(f"共找到 {len(versions)} 个版本")
-
-    for url in versions[:5]:  # 可调试先下载前5个
+    for link in versions[:3]:  # 限制下载数量为前 3 个
         try:
-            download_apk(url)
-            time.sleep(2)  # 避免请求太快被封
+            # 下载 APK
+            path = download_apk(link)
+            
+            # 上传文件到 123pan
+            upload_to_123pan(path)
         except Exception as e:
-            print(f"下载失败: {e}")
+            print(f"Error occurred: {e}")
 
 if __name__ == "__main__":
     main()
