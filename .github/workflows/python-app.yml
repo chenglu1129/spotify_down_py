@@ -1,35 +1,29 @@
-name: Auto Download Spotify APKs
+name: Download and Upload Spotify APKs to 123Pan
 
 on:
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
   schedule:
-    - cron: "0 1 * * *"  # 每天 01:00 UTC 执行，可改为你想要的时间
+    - cron: "0 1 * * *"  # 每天 01:00 UTC 执行（可自定义时间）
 
 jobs:
-  download:
+  run-script:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 拉取仓库
+    - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: 设置 Python 环境
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.9
+        python-version: "3.9"
 
-    - name: 安装依赖
+    - name: Install dependencies
       run: |
         pip install -r requirements.txt
 
-    - name: 执行下载脚本
+    - name: Run downloader
+      env:
+        PAN_COOKIE: ${{ secrets.PAN_COOKIE }}  # 从 Secrets 获取 cookie
       run: |
         python test.py
-
-    - name: 提交 APK 到仓库（可选）
-      run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "github-actions@github.com"
-        git add spotify_apks/
-        git commit -m "auto: 下载 Spotify APK 文件" || echo "无更新"
-        git push
