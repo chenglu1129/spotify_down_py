@@ -1,39 +1,35 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
-name: Python application
+name: Auto Download Spotify APKs
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
+  workflow_dispatch:  # 允许手动触发
+  schedule:
+    - cron: "0 1 * * *"  # 每天 01:00 UTC 执行，可改为你想要的时间
 
 jobs:
-  build:
-
+  download:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+    - name: 拉取仓库
+      uses: actions/checkout@v3
+
+    - name: 设置 Python 环境
+      uses: actions/setup-python@v4
       with:
-        python-version: "3.10"
-    - name: Install dependencies
+        python-version: 3.9
+
+    - name: 安装依赖
       run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
+        pip install -r requirements.txt
+
+    - name: 执行下载脚本
       run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
+        python spotify_downloader.py
+
+    - name: 提交 APK 到仓库（可选）
       run: |
-        pytest
+        git config --global user.name "github-actions"
+        git config --global user.email "github-actions@github.com"
+        git add spotify_apks/
+        git commit -m "auto: 下载 Spotify APK 文件" || echo "无更新"
+        git push
